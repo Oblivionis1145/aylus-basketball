@@ -10,6 +10,7 @@ nav a{color:#f3ece2;text-decoration:none;padding:8px 10px;border-radius:8px;font
 nav a.on{background:var(--or);color:#fff}
 .auth{display:flex;gap:8px;align-items:center;font-size:14px}
 .auth button{min-height:36px}
+.lang{color:#fff;border-color:#5a5048;min-width:52px}
 .band{padding:clamp(22px,4vw,52px) max(5vw,16px)}.wrap{max-width:1100px;margin:0 auto}
 .hero{background:var(--or);color:#fff;position:relative;overflow:hidden}
 .hero svg.court{position:absolute;right:-60px;top:-40px;width:420px;height:420px;opacity:.2;pointer-events:none}
