@@ -4,7 +4,7 @@ import { esc, zhDate, addDays, splitRoster, buildReport, pickForecast, fmtHours 
 
 const $ = id => document.getElementById(id);
 const app = $('app');
-const configured = !SUPABASE_URL.includes('YOUR-PROJECT') || SUPABASE_ANON_KEY.startsWith('YOUR');
+const configured = !(SUPABASE_URL.includes('YOUR-PROJECT') || SUPABASE_ANON_KEY.startsWith('YOUR'));
 if (!configured) $('setupWarn').classList.remove('hidden');
 const sb = configured ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY) : null;
 
