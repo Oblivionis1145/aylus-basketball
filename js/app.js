@@ -1,10 +1,10 @@
-import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/+esm';
+import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.119.0/+esm';
 import { SUPABASE_URL, SUPABASE_ANON_KEY, PARK } from './config.js';
 import { esc, zhDate, addDays, splitRoster, buildReport, pickForecast, fmtHours } from './util.js';
 
 const $ = id => document.getElementById(id);
 const app = $('app');
-const configured = !SUPABASE_URL.includes('YOUR-PROJECT');
+const configured = !SUPABASE_URL.includes('YOUR-PROJECT') || SUPABASE_ANON_KEY.startsWith('YOUR');
 if (!configured) $('setupWarn').classList.remove('hidden');
 const sb = configured ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY) : null;
 
