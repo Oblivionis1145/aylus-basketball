@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>AYLUS 社区公益篮球</title>
+<meta name="description" content="每周日 Syosset-Woodbury Community Park 社区公益篮球活动：时间地点、接龙报名、分组、天气、照片和活动报告。">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;700;900&family=Oswald:wght@500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<header class="top">
+  <a class="brand" href="#/">AYLUS 社区篮球</a>
+  <nav id="nav">
+    <a href="#/">本周活动</a>
+    <a href="#/photos">照片墙</a>
+    <a href="#/reports">活动报告</a>
+    <a href="#/hours">义工时长</a>
+    <a href="#/admin" id="navAdmin" class="hidden">后台</a>
+  </nav>
+  <div id="authBox" class="auth"></div>
+</header>
+<div id="setupWarn" class="banner hidden">网站还没有连接数据库：请在 js/config.js 里填写 Supabase 地址和密钥。</div>
+<main id="app"><p class="band muted">加载中…</p></main>
+<footer>义工自发组织 · 免费公益活动 · Syosset, NY 11791</footer>
+<script type="module" src="js/app.js"></script>
+</body>
+</html>
