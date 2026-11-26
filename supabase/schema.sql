@@ -174,6 +174,13 @@ create policy r_read on public.reports for select using (published or public.is_
 create policy r_admin on public.reports for all using (public.is_admin()) with check (public.is_admin());
 
 
+-- ========== 表访问权限 ==========
+grant usage on schema public to anon, authenticated;
+grant select on public.events, public.signups, public.team_assignments, public.photos, public.reports, public.volunteer_hours to anon;
+grant select, insert, update, delete on public.profiles, public.events, public.signups, public.team_assignments, public.volunteer_hours, public.photos, public.reports to authenticated;
+grant usage, select on all sequences in schema public to authenticated;
+grant execute on function public.volunteer_leaderboard(), public.is_admin() to anon, authenticated;
+
 -- ========== 照片存储桶 ==========
 insert into storage.buckets (id, name, public) values ('photos', 'photos', true)
   on conflict (id) do update set public = true;
