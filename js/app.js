@@ -114,7 +114,7 @@ async function homeView() {
       <p style="margin:0 0 16px"><span class="status ${esc(ev.status)}"><i></i>${esc(STATUS[ev.status] || STATUS.ok)}</span></p>
       <div class="facts">
         <div class="fact"><b>${t('time')}</b><span>${esc(ev.time_text)}</span></div>
-        <div class="fact"><b>${t('place')}</b><span>${esc(ev.location)}</span><br><a href="https://www.google.com/maps/search/?api=1&query=Syosset-Woodbury+Community+Park" target="_blank" rel="noopener">${t('map')}</a></div>
+        <div class="fact"><b>${t('place')}</b><span>${esc(lang === 'en' ? ev.location.replace('篮球场（11791）', 'basketball courts (11791)') : ev.location)}</span><br><a href="https://www.google.com/maps/search/?api=1&query=Syosset-Woodbury+Community+Park" target="_blank" rel="noopener">${t('map')}</a></div>
         <div class="fact"><b>${t('weather')}</b><span id="wx">${t('wxLoading')}</span><br><a href="https://forecast.weather.gov/MapClick.php?lat=${PARK.lat}&lon=${PARK.lon}" target="_blank" rel="noopener">${t('fullFc')}</a> · ${t('autoCancel')}</div>
       </div>
       ${ev.notice ? `<p style="margin:14px 0 0;font-weight:500">📢 ${esc(ev.notice)}</p>` : ''}
