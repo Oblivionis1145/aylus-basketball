@@ -119,14 +119,7 @@ async function homeView() {
       </div>
       ${ev.notice ? `<p style="margin:14px 0 0;font-weight:500">📢 ${esc(ev.notice)}</p>` : ''}
     </div></section>
-  <section class="band"><div class="wrap grid">
-    <div class="card"><h2>${t('roster')}</h2>
-      <div class="count">${confirmed.length}<small> / ${esc(ev.cap)} ${t('people')}</small></div>
-      <div class="meter"><div style="width:${Math.min(100, confirmed.length / ev.cap * 100)}%"></div></div>
-      <div class="muted">${t('rosterNote')}</div>
-      ${all.length ? `<ol class="roster">${confirmed.map((s, i) => rosterRow(s, i + 1, tmap)).join('')}</ol>` : `<p class="muted">${t('emptyRoster')}</p>`}
-      ${waitlist.length ? `<div class="wait">${t('waitlist')}</div><ol class="roster">${waitlist.map((s, i) => rosterRow(s, i + 1, tmap)).join('')}</ol>` : ''}
-    </div>
+  <section class="band"><div class="wrap stack2">
     <div class="card"><h2>${t('signUp')}</h2>
       ${!S.user ? `<p>${t('needLogin')}</p><a href="#/login"><button>${t('loginToSign')}</button></a>` :
       !canSign ? `<p class="muted">${ev.status === 'cancel' ? t('closedCancel') : t('closed')}</p>` : `
@@ -140,7 +133,15 @@ async function homeView() {
         <button id="fBtn">${t('fBtn')}</button><div class="msg" id="fMsg"></div>
       </form>`}
       ${mine.length ? `<h3>${t('mine')}</h3><ul class="mine">${mine.map(s => { const p = all.indexOf(s) + 1; return `<li><span><b>${esc(s.name)}</b> · ${p <= ev.cap ? t('pos', p) : t('wpos', p - ev.cap)}</span><button class="ghost sm" data-del="${esc(s.id)}">${t('cancelSign')}</button></li>`; }).join('')}</ul><p class="muted">${t('multi')}</p>` : ''}
-    </div></div></section>
+    </div>
+    <div class="card"><div class="rhead"><h2>${t('roster')}</h2>${all.length ? `<button class="ghost sm" id="copyList">${t('copyList')}</button>` : ''}</div>
+      <div class="count">${confirmed.length}<small> / ${esc(ev.cap)} ${t('people')}</small></div>
+      <div class="meter"><div style="width:${Math.min(100, confirmed.length / ev.cap * 100)}%"></div></div>
+      <div class="muted">${t('rosterNote')}</div>
+      ${all.length ? `<ol class="roster">${confirmed.map((s, i) => rosterRow(s, i + 1, tmap)).join('')}</ol>` : `<p class="muted">${t('emptyRoster')}</p>`}
+      ${waitlist.length ? `<div class="wait">${t('waitlist')}</div><ol class="roster">${waitlist.map((s, i) => rosterRow(s, i + 1, tmap)).join('')}</ol>` : ''}
+    </div>
+  </div></section>
   <section class="band alt"><div class="wrap"><h2>${t('teams')}</h2>
     ${hasTeams ? `<div class="teams">${Object.keys(byTeam).filter(k => byTeam[k].length).map(k => `<div class="card"><h3 style="margin-top:0">${esc(TEAMS[k])}（${byTeam[k].length}）</h3><ul>${byTeam[k].map(s => `<li>${esc(s.name)} ${esc(t('age', s.age))}${s.is_volunteer ? t('volMark') : ''}</li>`).join('')}</ul></div>`).join('')}</div>` : `<p class="muted">${t('noTeams')}</p>`}
   </div></section>
@@ -151,6 +152,12 @@ async function homeView() {
     if (!w) { el.textContent = note || t('wxNone'); return; }
     el.textContent = `${note}${t('wxLine', w.short, w.temp, w.unit, w.pop)}${w.wet && ev.status === 'ok' ? t('wxWet') : ''}`;
   });
+  const cl = $('copyList');
+  if (cl) cl.onclick = async () => {
+    const line = (x, i) => `${i}. ${x.name}，${x.age}${x.is_volunteer ? '（义工）' : ''}${x.join_after ? ' 参加' : ''}`;
+    const txt = [`#接龙 ${t('roundLine', String(ev.event_date).slice(0, 4), ev.round)}`, `${fmtDate(ev.event_date)} ${ev.time_text}`, '', ...confirmed.map((x, i) => line(x, i + 1)), ...(waitlist.length ? ['', t('waitlist'), ...waitlist.map((x, i) => line(x, i + 1))] : []), '', location.origin + '/'].join('\n');
+    try { await navigator.clipboard.writeText(txt); cl.textContent = t('copied'); } catch { cl.textContent = t('copyFail'); }
+  };
   const sf = $('sf');
   if (sf) sf.onsubmit = async e => {
     e.preventDefault(); const m = $('fMsg');

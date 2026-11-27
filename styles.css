@@ -86,3 +86,5 @@ td.num,th.num{text-align:right;font-variant-numeric:tabular-nums;white-space:now
 .admin-row input{width:5.5em}
 @media(max-width:600px){.admin-row{grid-template-columns:2em minmax(0,1fr) auto}.admin-row .wide{grid-column:2/-1}}
 footer{text-align:center;color:var(--mute);font-size:14px;padding:28px 16px}
+.stack2{display:grid;gap:20px;max-width:760px}
+.rhead{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}.rhead h2{margin:0}
