@@ -91,3 +91,11 @@ footer{text-align:center;color:var(--mute);font-size:14px;padding:28px 16px}
 .admin-edit{background:var(--bg);border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin:4px 0 8px}
 .admin-edit label input,.admin-edit label select{margin-top:4px}
 details summary{cursor:pointer;min-height:32px}
+.filters{display:flex;flex-wrap:wrap;gap:10px;margin:8px 0 12px}.filters label{margin:0;font-size:14px}.filters select{width:auto;min-width:9em;margin-top:4px}
+.evgroup{margin-bottom:22px}.evgroup h3{display:flex;flex-wrap:wrap;gap:10px;align-items:baseline}.sm-link{font-size:14px;font-weight:500}
+.reps li{display:grid;grid-template-columns:96px minmax(0,1fr);gap:12px;align-items:start}.reps img{width:96px;height:72px;object-fit:cover;border-radius:8px}
+.reps li>div>div+div{margin-top:4px}
+.rich p{margin:0 0 12px}.rich ul,.rich ol{padding-left:1.3em}.rich h2,.rich h3{font-size:19px;margin:18px 0 8px}
+.lightbox figure{margin:0;max-width:100%;max-height:100%;display:flex;flex-direction:column;align-items:center}.lightbox figure img{max-height:82vh}.lightbox figcaption{color:#ddd;font-size:14px;margin-top:8px;text-align:center}
+.lb-btn{position:absolute;background:rgba(255,255,255,.15);color:#fff;font-size:30px;min-width:48px;min-height:48px;border-radius:50%;padding:0}
+.lb-prev{left:10px;top:50%}.lb-next{right:10px;top:50%}.lb-close{right:10px;top:10px}

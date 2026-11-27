@@ -2,6 +2,7 @@ import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js
 import { SUPABASE_URL, SUPABASE_ANON_KEY, PARK } from './config.js';
 import { esc, addDays, splitRoster, buildReport, pickForecast, fmtHours } from './util.js';
 import { t, lang, setLang, fmtDate } from './i18n.js';
+import { loadAylus, groupByDate } from './aylus.js';
 
 const $ = id => document.getElementById(id);
 const app = $('app');
@@ -193,44 +194,115 @@ function staticInfo() {
   </div><p class="wrap" style="margin-top:18px;font-weight:700">${t('agree')}</p></section>`;
 }
 
-// ---------- 照片墙 ----------
+// ---------- 照片墙与活动报告（本站 + aylus.org） ----------
 const photoUrl = path => sb.storage.from('photos').getPublicUrl(path).data.publicUrl;
-async function photosView() {
-  const [{ data: photos }, { data: events }] = await Promise.all([
-    sb.from('photos').select('*').order('created_at', { ascending: false }).limit(300),
-    sb.from('events').select('id,round,event_date'),
+// 把 aylus.org 的报告和本站的报告、照片按活动日期合并
+async function loadArchive() {
+  const [ay, own, ph] = await Promise.all([
+    loadAylus().then(x => ({ ok: true, x }), () => ({ ok: false, x: [] })),
+    sb.from('reports').select('id,title,body,published,event_id,events(event_date,round)').order('created_at', { ascending: false }),
+    sb.from('photos').select('*,events(event_date,round)').order('created_at'),
   ]);
-  const evm = Object.fromEntries((events || []).map(e => [e.id, e]));
-  const groups = {};
-  (photos || []).forEach(p => (groups[p.event_id ?? 0] ||= []).push(p));
-  const keys = Object.keys(groups).sort((a, b) => String(evm[b]?.event_date || '').localeCompare(String(evm[a]?.event_date || '')));
-  app.innerHTML = `<section class="band"><div class="wrap"><h2>${t('photos')}</h2>
-    ${keys.length ? keys.map(k => `<h3>${evm[k] ? esc(t('roundDate', evm[k].round, fmtDate(evm[k].event_date))) : t('other')}</h3>
-      <div class="gallery">${groups[k].map(p => `<figure><img loading="lazy" src="${esc(photoUrl(p.path))}" alt="${esc(p.caption || t('photoAlt'))}">${p.caption ? `<figcaption>${esc(p.caption)}</figcaption>` : ''}</figure>`).join('')}</div>`).join('') : `<p class="muted">${t('noPhotos')}</p>`}
-  </div></section>`;
-  app.querySelectorAll('.gallery img').forEach(img => img.onclick = () => {
-    const lb = document.createElement('div'); lb.className = 'lightbox'; lb.innerHTML = `<img src="${esc(img.src)}" alt="">`;
-    lb.onclick = () => lb.remove(); document.body.append(lb);
-  });
+  const map = new Map();
+  const get = date => { if (!map.has(date)) map.set(date, { date, num: null, aylus: [], own: [], photos: [] }); return map.get(date); };
+  for (const g of groupByDate(ay.x)) { const e = get(g.date); e.num = g.num; e.aylus = g.posts; g.posts.forEach(p => p.photos.forEach(f => e.photos.push({ ...f, src: 'aylus', post: p.id }))); }
+  for (const r of own.data || []) if (r.events) { const e = get(r.events.event_date); e.own.push(r); e.num ??= r.events.round; }
+  for (const p of ph.data || []) { const d = p.events?.event_date || String(p.created_at).slice(0, 10); const e = get(d); if (p.events) e.num ??= p.events.round; const u = photoUrl(p.path); e.photos.push({ full: u, thumb: u, caption: p.caption, src: 'own' }); }
+  return { ok: ay.ok, events: [...map.values()].sort((x, y) => y.date.localeCompare(x.date)) };
+}
+const evLabel = e => `${fmtDate(e.date)}${e.num ? ' · ' + t('nth', e.date.slice(0, 4), e.num) : ''}`;
+const reportHref = e => e.aylus[0] ? `#/report/a${e.aylus[0].id}` : e.own[0] ? `#/report/${e.own[0].id}` : '';
+function filterBar(events, f, withEvent) {
+  const years = [...new Set(events.map(e => e.date.slice(0, 4)))];
+  const months = [...new Set(events.filter(e => !f.y || e.date.startsWith(f.y)).map(e => e.date.slice(5, 7)))].sort();
+  const evs = events.filter(e => (!f.y || e.date.startsWith(f.y)) && (!f.m || e.date.slice(5, 7) === f.m));
+  return `<div class="filters">
+    <label>${t('fYear')}<select id="fy"><option value="">${t('all')}</option>${years.map(y => `<option${f.y === y ? ' selected' : ''}>${y}</option>`).join('')}</select></label>
+    <label>${t('fMonth')}<select id="fm"><option value="">${t('all')}</option>${months.map(m => `<option value="${m}"${f.m === m ? ' selected' : ''}>${esc(t('monthName', +m))}</option>`).join('')}</select></label>
+    ${withEvent ? `<label>${t('fEvent')}<select id="fe"><option value="">${t('all')}</option>${evs.map(e => `<option value="${e.date}"${f.e === e.date ? ' selected' : ''}>${esc(evLabel(e))}</option>`).join('')}</select></label>` : ''}
+  </div>`;
+}
+function applyFilter(events, f) { return events.filter(e => (!f.y || e.date.startsWith(f.y)) && (!f.m || e.date.slice(5, 7) === f.m) && (!f.e || e.date === f.e)); }
+function bindFilter(f, rerender) {
+  $('fy').onchange = () => { f.y = $('fy').value; f.m = ''; f.e = ''; rerender(); };
+  $('fm').onchange = () => { f.m = $('fm').value; f.e = ''; rerender(); };
+  if ($('fe')) $('fe').onchange = () => { f.e = $('fe').value; rerender(); };
+}
+function lightbox(list, i) {
+  const lb = document.createElement('div'); lb.className = 'lightbox'; lb.tabIndex = -1;
+  const show = () => { const p = list[i]; lb.innerHTML = `<button class="lb-btn lb-prev" aria-label="prev">‹</button><figure><img src="${esc(p.full)}" alt="${esc(p.caption || t('photoAlt'))}"><figcaption>${esc(p.label || '')} · ${i + 1}/${list.length}</figcaption></figure><button class="lb-btn lb-next" aria-label="next">›</button><button class="lb-btn lb-close" aria-label="close">×</button>`; };
+  const go = d => { i = (i + d + list.length) % list.length; show(); };
+  lb.onclick = e => { if (e.target.closest('.lb-prev')) go(-1); else if (e.target.closest('.lb-next')) go(1); else if (!e.target.closest('img')) lb.remove(); };
+  lb.onkeydown = e => { if (e.key === 'ArrowLeft') go(-1); else if (e.key === 'ArrowRight') go(1); else if (e.key === 'Escape') lb.remove(); };
+  show(); document.body.append(lb); lb.focus();
+}
+const photoFilter = { y: '', m: '', e: '' };
+async function photosView() {
+  app.innerHTML = `<section class="band"><div class="wrap"><h2>${t('photos')}</h2><p class="muted">${t('loadingArchive')}</p></div></section>`;
+  const { ok, events } = await loadArchive();
+  const all = events.filter(e => e.photos.length);
+  const render = () => {
+    const shown = applyFilter(all, photoFilter);
+    const flat = []; shown.forEach(e => e.photos.forEach(p => flat.push({ ...p, label: evLabel(e) })));
+    let k = 0;
+    app.innerHTML = `<section class="band"><div class="wrap"><h2>${t('photos')}</h2>
+      <p class="muted">${t('photosIntro')}${ok ? '' : ' ' + t('aylusDown')}</p>
+      ${filterBar(all, photoFilter, true)}
+      <p class="muted">${esc(t('photoCount', shown.length, flat.length))}</p>
+      ${shown.length ? shown.map(e => `<div class="evgroup"><h3>${esc(evLabel(e))}${reportHref(e) ? ` <a class="sm-link" href="${reportHref(e)}">${t('readReport')}</a>` : ''}</h3>
+        <div class="gallery">${e.photos.map(p => `<figure><img loading="lazy" data-i="${k++}" src="${esc(p.thumb)}" alt="${esc(p.caption || t('photoAlt'))}">${p.caption ? `<figcaption>${esc(p.caption)}</figcaption>` : ''}</figure>`).join('')}</div></div>`).join('') : `<p class="muted">${t('noPhotos')}</p>`}
+    </div></section>`;
+    bindFilter(photoFilter, render);
+    app.querySelectorAll('.gallery img').forEach(img => img.onclick = () => lightbox(flat, +img.dataset.i));
+  };
+  render();
 }
 
-// ---------- 活动报告 ----------
+const reportFilter = { y: '', m: '', e: '' };
 async function reportsView() {
-  const { data } = await sb.from('reports').select('id,title,published,created_at,events(event_date,round)').order('created_at', { ascending: false });
-  app.innerHTML = `<section class="band"><div class="wrap"><h2>${t('reports')}</h2>${t('reportNote') ? `<p class="muted">${t('reportNote')}</p>` : ''}
-    ${data?.length ? `<ul class="list">${data.map(r => `<li><a href="#/report/${esc(r.id)}">${esc(r.title)}</a>${r.published ? '' : ` <span class="tag">${t('draft')}</span>`}<div class="muted">${r.events ? esc(fmtDate(r.events.event_date)) : ''}</div></li>`).join('')}</ul>` : `<p class="muted">${t('noReports')}</p>`}
-  </div></section>`;
+  app.innerHTML = `<section class="band"><div class="wrap"><h2>${t('reports')}</h2><p class="muted">${t('loadingArchive')}</p></div></section>`;
+  const { ok, events } = await loadArchive();
+  const all = events.filter(e => e.aylus.length || e.own.length);
+  const render = () => {
+    const shown = applyFilter(all, reportFilter);
+    app.innerHTML = `<section class="band"><div class="wrap"><h2>${t('reports')}</h2>
+      <p class="muted">${t('reportsIntro')}${ok ? '' : ' ' + t('aylusDown')}</p>
+      ${filterBar(all, reportFilter, false)}
+      ${shown.length ? `<ul class="list reps">${shown.map(e => {
+        const items = [...e.aylus.map(p => ({ href: `#/report/a${p.id}`, title: p.title, tag: 'AYLUS' })), ...e.own.filter(r => r.published || S.isAdmin).map(r => ({ href: `#/report/${r.id}`, title: r.title, tag: r.published ? t('ownSite') : t('draft') }))];
+        return `<li>${e.photos[0] ? `<img src="${esc(e.photos[0].thumb)}" alt="" loading="lazy">` : '<span></span>'}<div><div class="muted">${esc(evLabel(e))}</div>${items.map(i => `<div><a href="${i.href}">${esc(i.title)}</a> <span class="tag">${esc(i.tag)}</span></div>`).join('')}</div></li>`;
+      }).join('')}</ul>` : `<p class="muted">${t('noReports')}</p>`}
+    </div></section>`;
+    bindFilter(reportFilter, render);
+  };
+  render();
 }
 async function reportView(id) {
+  if (String(id).startsWith('a')) {
+    const posts = await loadAylus().catch(() => []);
+    const p = posts.find(x => String(x.id) === id.slice(1));
+    if (!p) { app.innerHTML = `<section class="band"><div class="wrap"><p>${t('noReport')}</p><p><a href="#/reports">${t('allReports')}</a></p></div></section>`; return; }
+    const pics = p.photos.map(f => ({ ...f, label: p.title }));
+    app.innerHTML = `<section class="band"><div class="wrap report"><p><a href="#/reports">${t('allReports')}</a></p>
+      <div class="muted">${esc(fmtDate(p.date))}${p.num ? ' · ' + esc(t('nth', p.date.slice(0, 4), p.num)) : ''} · <a href="${esc(p.link)}" target="_blank" rel="noopener">${t('onAylus')}</a></div>
+      <h1 style="font-size:clamp(24px,4vw,34px)">${esc(p.title)}</h1>
+      <div class="rich">${p.html}</div>
+      ${pics.length ? `<div class="gallery" style="margin-top:20px">${pics.map((f, i) => `<figure><img loading="lazy" data-i="${i}" src="${esc(f.thumb)}" alt="${t('photoAlt')}"></figure>`).join('')}</div>` : ''}
+    </div></section>`;
+    app.querySelectorAll('.gallery img').forEach(img => img.onclick = () => lightbox(pics, +img.dataset.i));
+    return;
+  }
   const { data: r } = await sb.from('reports').select('*').eq('id', id).maybeSingle();
   if (!r) { app.innerHTML = `<section class="band"><div class="wrap"><p>${t('noReport')}</p></div></section>`; return; }
   const { data: photos } = r.event_id ? await sb.from('photos').select('*').eq('event_id', r.event_id) : { data: [] };
+  const pics = (photos || []).map(p => ({ full: photoUrl(p.path), thumb: photoUrl(p.path), label: r.title }));
   app.innerHTML = `<section class="band"><div class="wrap report"><p><a href="#/reports">${t('allReports')}</a></p>
     <h1 style="font-size:clamp(24px,4vw,34px)">${esc(r.title)}</h1>
     <div class="body">${esc(r.body)}</div>
-    ${photos?.length ? `<div class="gallery" style="margin-top:20px">${photos.map(p => `<figure><img loading="lazy" src="${esc(photoUrl(p.path))}" alt="${t('photoAlt')}"></figure>`).join('')}</div>` : ''}
+    ${pics.length ? `<div class="gallery" style="margin-top:20px">${pics.map((f, i) => `<figure><img loading="lazy" data-i="${i}" src="${esc(f.thumb)}" alt="${t('photoAlt')}"></figure>`).join('')}</div>` : ''}
     <p><button class="ghost" id="copyR">${t('copyAll')}</button> <span class="msg" id="cMsg"></span></p>
   </div></section>`;
+  app.querySelectorAll('.gallery img').forEach(img => img.onclick = () => lightbox(pics, +img.dataset.i));
   $('copyR').onclick = async () => { try { await navigator.clipboard.writeText(`${r.title}\n\n${r.body}`); msg($('cMsg'), t('copied'), true); } catch { msg($('cMsg'), t('copyFail')); } };
 }
 

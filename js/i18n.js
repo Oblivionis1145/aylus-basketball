@@ -45,6 +45,10 @@ const D = {
     photosN: n => `照片（${n} 张）`, photoNote: '只上传可以公开的照片，注意避开报名时勾选了“不拍照”的孩子。', upload: '上传', pickFirst: '请先选择照片', upFail: (n, e) => `第 ${n} 张上传失败：${e}`, upProg: (n, t) => `已上传 ${n}/${t}`, del: '删除', sureDel: '确认删除',
     repTitle: '活动报告', repNote: '按 AYLUS 报告格式生成（英文）。先保存好义工时长，再点“生成”。', highlight: '本周亮点（可选，英文一两句）', gen: '按模板生成', title: '标题', body: '正文', publish: '公开发布到“活动报告”', saveRep: '保存报告', copyBtn: '复制全文',
     genOk: '已生成，可以再修改后保存', genNoVol: '已生成。还没有登记义工时长，所以没有义工名单。', needTB: '标题和正文不能为空', pubOk: '已保存并发布', draftOk: '已保存为草稿',
+    nth: (y, n) => `${y} 年第 ${n} 次`, fYear: '年份', fMonth: '月份', fEvent: '活动', all: '全部', monthName: m => `${m} 月`,
+    loadingArchive: '正在读取 AYLUS 网站上的报告和照片…', photosIntro: '包括 AYLUS 网站上发布的活动照片和本站上传的照片，AYLUS 上有新报告时会自动出现。点照片可放大，左右键切换。',
+    reportsIntro: '自动收录 AYLUS 网站上 Syosset-Woodbury 篮球活动的全部报告（从 2025 年第 14 次起），新报告发布后会自动出现。', aylusDown: '（AYLUS 网站暂时读取不到，目前只显示本站内容。）',
+    photoCount: (e, n) => `${e} 次活动，${n} 张照片`, readReport: '看报告', ownSite: '本站', onAylus: '在 AYLUS 网站查看原文',
     langBtn: 'EN',
   },
   en: {
@@ -84,6 +88,10 @@ const D = {
     photosN: n => `Photos (${n})`, photoNote: 'Upload only photos that can be public, and leave out children marked “No photos”.', upload: 'Upload', pickFirst: 'Choose photos first', upFail: (n, e) => `Photo ${n} failed: ${e}`, upProg: (n, t) => `Uploaded ${n}/${t}`, del: 'Delete', sureDel: 'Confirm delete',
     repTitle: 'Event report', repNote: 'Generated in the AYLUS report format. Save the volunteer hours first, then click Generate.', highlight: 'This week’s highlight (optional, one or two sentences)', gen: 'Generate from template', title: 'Title', body: 'Body', publish: 'Publish to “Event reports”', saveRep: 'Save report', copyBtn: 'Copy full text',
     genOk: 'Generated. Edit if needed, then save.', genNoVol: 'Generated. No volunteer hours recorded yet, so there is no volunteer list.', needTB: 'Title and body are required', pubOk: 'Saved and published', draftOk: 'Saved as draft',
+    nth: (y, n) => `${y} event #${n}`, fYear: 'Year', fMonth: 'Month', fEvent: 'Event', all: 'All', monthName: m => ['January','February','March','April','May','June','July','August','September','October','November','December'][m - 1],
+    loadingArchive: 'Loading reports and photos from aylus.org…', photosIntro: 'Photos from reports on aylus.org plus photos uploaded here. New AYLUS reports show up automatically. Click a photo to enlarge; use the arrow keys to browse.',
+    reportsIntro: 'Every Syosset-Woodbury basketball report on aylus.org since the 14th event of 2025, added automatically as new ones are posted.', aylusDown: '(aylus.org could not be reached right now, so only this site’s content is shown.)',
+    photoCount: (e, n) => `${e} event${e === 1 ? '' : 's'}, ${n} photo${n === 1 ? '' : 's'}`, readReport: 'Read report', ownSite: 'This site', onAylus: 'View on aylus.org',
     langBtn: '中文',
   },
 };
