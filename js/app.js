@@ -100,10 +100,10 @@ async function homeView() {
   const ev = await currentEvent();
   if (!ev) { app.innerHTML = `<section class="band"><div class="wrap"><h2>${t('noEvent')}</h2><p class="muted">${t('noEventSub')}</p></div></section>` + staticInfo(); return; }
   const { signups, tmap } = await eventRoster(ev.id);
-  const { confirmed, waitlist, all } = splitRoster(signups, ev.cap);
+  const { vols, confirmed, waitlist, all } = splitRoster(signups, ev.cap);
   const mine = all.filter(s => s.user_id === S.user?.id);
   const canSign = ev.signup_open && ev.status !== 'cancel';
-  const byTeam = { A: [], B: [], T: [] }; confirmed.forEach(s => tmap[s.id] && byTeam[tmap[s.id]].push(s));
+  const byTeam = { A: [], B: [], T: [] }; [...vols, ...confirmed].forEach(s => tmap[s.id] && byTeam[tmap[s.id]].push(s));
   const hasTeams = Object.values(byTeam).some(a => a.length);
   app.innerHTML = `
   ${ev.status === 'cancel' ? `<div class="banner">${t('cancelled')}</div>` : ''}
@@ -126,13 +126,17 @@ async function homeView() {
       <form id="sf" novalidate>
         <div class="row2"><div><label for="fName">${t('fName')}</label><input type="text" id="fName" maxlength="40" placeholder="${t('fNamePh')}" autocomplete="off"></div>
         <div><label for="fAge">${t('fAge')}</label><input type="number" id="fAge" min="1" max="99" inputmode="numeric"></div></div>
-        <label class="chk"><input type="checkbox" id="fVol">${t('fVol')}</label>
+        <label for="fType">${t('typeLabel')}</label><select id="fType"><option value="p">${t('typePlayer')}</option><option value="v">${t('typeVol')}</option></select>
         <label class="chk"><input type="checkbox" id="fAfter" checked>${t('fAfter')}</label>
         <label class="chk"><input type="checkbox" id="fNoPhoto">${t('fNoPhoto')}</label>
         <label class="chk"><input type="checkbox" id="fRules">${t('fRules')}</label>
         <button id="fBtn">${t('fBtn')}</button><div class="msg" id="fMsg"></div>
       </form>`}
-      ${mine.length ? `<h3>${t('mine')}</h3><ul class="mine">${mine.map(s => { const p = all.indexOf(s) + 1; return `<li><span><b>${esc(s.name)}</b> · ${p <= ev.cap ? t('pos', p) : t('wpos', p - ev.cap)}</span><button class="ghost sm" data-del="${esc(s.id)}">${t('cancelSign')}</button></li>`; }).join('')}</ul><p class="muted">${t('multi')}</p>` : ''}
+      ${mine.length ? `<h3>${t('mine')}</h3><ul class="mine">${mine.map(s => { const vp = vols.indexOf(s) + 1, p = confirmed.indexOf(s) + 1, w = waitlist.indexOf(s) + 1; return `<li><span><b>${esc(s.name)}</b> · ${vp ? t('vpos', vp) : p ? t('pos', p) : t('wpos', w)}</span><button class="ghost sm" data-del="${esc(s.id)}">${t('cancelSign')}</button></li>`; }).join('')}</ul><p class="muted">${t('multi')}</p>` : ''}
+    </div>
+    <div class="card"><div class="rhead"><h2>${t('volRoster')}（${vols.length}）</h2></div>
+      <div class="muted">${t('volNote')}</div>
+      ${vols.length ? `<ol class="roster">${vols.map((s, i) => rosterRow(s, i + 1, tmap)).join('')}</ol>` : `<p class="muted">${t('emptyVol')}</p>`}
     </div>
     <div class="card"><div class="rhead"><h2>${t('roster')}</h2>${all.length ? `<button class="ghost sm" id="copyList">${t('copyList')}</button>` : ''}</div>
       <div class="count">${confirmed.length}<small> / ${esc(ev.cap)} ${t('people')}</small></div>
@@ -155,7 +159,7 @@ async function homeView() {
   const cl = $('copyList');
   if (cl) cl.onclick = async () => {
     const line = (x, i) => `${i}. ${x.name}，${x.age}${x.is_volunteer ? '（义工）' : ''}${x.join_after ? ' 参加' : ''}`;
-    const txt = [`#接龙 ${t('roundLine', String(ev.event_date).slice(0, 4), ev.round)}`, `${fmtDate(ev.event_date)} ${ev.time_text}`, '', ...confirmed.map((x, i) => line(x, i + 1)), ...(waitlist.length ? ['', t('waitlist'), ...waitlist.map((x, i) => line(x, i + 1))] : []), '', location.origin + '/'].join('\n');
+    const txt = [`#接龙 ${t('roundLine', String(ev.event_date).slice(0, 4), ev.round)}`, `${fmtDate(ev.event_date)} ${ev.time_text}`, '', ...(vols.length ? [t('volRoster'), ...vols.map((x, i) => line(x, i + 1)), ''] : []), t('roster'), ...confirmed.map((x, i) => line(x, i + 1)), ...(waitlist.length ? ['', t('waitlist'), ...waitlist.map((x, i) => line(x, i + 1))] : []), '', location.origin + '/'].join('\n');
     try { await navigator.clipboard.writeText(txt); cl.textContent = t('copied'); } catch { cl.textContent = t('copyFail'); }
   };
   const sf = $('sf');
@@ -165,7 +169,7 @@ async function homeView() {
     if (!name) return msg(m, t('eName')); if (!(age > 0 && age < 100)) return msg(m, t('eAge'));
     if (!$('fRules').checked) return msg(m, t('eRules'));
     $('fBtn').disabled = true;
-    const { error } = await sb.from('signups').insert({ event_id: ev.id, name, age, is_volunteer: $('fVol').checked, join_after: $('fAfter').checked, no_photo: $('fNoPhoto').checked });
+    const { error } = await sb.from('signups').insert({ event_id: ev.id, name, age, is_volunteer: $('fType').value === 'v', join_after: $('fAfter').checked, no_photo: $('fNoPhoto').checked });
     if (error) { $('fBtn').disabled = false; return msg(m, error.code === '23505' ? t('eDup') : t('eSign') + errText(error)); }
     homeView();
   };
@@ -261,12 +265,27 @@ async function adminView() {
     return;
   }
   const { signups, tmap } = await eventRoster(ev.id);
-  const { confirmed, all } = splitRoster(signups, ev.cap);
+  const { vols, players, confirmed, all } = splitRoster(signups, ev.cap);
   const { data: hrs } = await sb.from('volunteer_hours').select('*').in('signup_id', all.map(s => s.id).concat([0]));
   const hmap = Object.fromEntries((hrs || []).map(h => [h.signup_id, h.hours]));
   const { data: rep } = await sb.from('reports').select('*').eq('event_id', ev.id).maybeSingle();
   const { data: photos } = await sb.from('photos').select('*').eq('event_id', ev.id);
 
+  const adminRow = (s, i, arr, wait) => `<div class="admin-row"><span class="no" style="font-weight:700;color:var(--or)">${i + 1}</span>
+        <span><b>${esc(s.name)}</b> <span class="muted">${esc(t('age', s.age))}</span>${s.join_after ? ` <span class="tag">${t('tagAfter')}</span>` : ''}${s.no_photo ? ` <span class="tag np">${t('tagNoPhoto')}</span>` : ''}${wait ? ` <span class="tag">${t('waitlist')}</span>` : ''}</span>
+        <select data-team="${s.id}" aria-label="${t('teams')}"><option value="">${t('unassigned')}</option>${Object.entries(TEAMS).map(([k, v]) => `<option value="${k}"${tmap[s.id] === k ? ' selected' : ''}>${v}</option>`).join('')}</select>
+        ${s.is_volunteer ? `<input type="number" step="0.5" min="0" max="24" data-hours="${s.id}" value="${hmap[s.id] != null ? esc(hmap[s.id]) : ''}" placeholder="${t('hoursPh')}" aria-label="${t('hoursPh')}">` : '<span></span>'}
+        <span class="wide" style="display:flex;gap:4px;flex-wrap:wrap">
+          <button class="ghost sm" data-mv="${s.id}" data-to="${arr[i - 1]?.id ?? ''}" aria-label="${t('up')}"${i ? '' : ' disabled'}>↑</button>
+          <button class="ghost sm" data-mv="${s.id}" data-to="${arr[i + 1]?.id ?? ''}" aria-label="${t('down')}"${i < arr.length - 1 ? '' : ' disabled'}>↓</button>
+          <button class="ghost sm" data-ed="${s.id}">${t('edit')}</button>
+          <button class="ghost sm" data-rm="${s.id}">${t('remove')}</button></span></div>
+      <div class="admin-edit hidden" id="ed${s.id}">
+        <div class="row2"><div><label>${t('fName')}<input type="text" data-f="name" value="${esc(s.name)}" maxlength="40"></label></div><div><label>${t('fAge')}<input type="number" data-f="age" value="${esc(s.age)}" min="1" max="99"></label></div></div>
+        <label>${t('typeLabel')}<select data-f="type"><option value="p"${s.is_volunteer ? '' : ' selected'}>${t('typePlayer')}</option><option value="v"${s.is_volunteer ? ' selected' : ''}>${t('typeVol')}</option></select></label>
+        <label class="chk"><input type="checkbox" data-f="after"${s.join_after ? ' checked' : ''}>${t('fAfter')}</label>
+        <label class="chk"><input type="checkbox" data-f="nophoto"${s.no_photo ? ' checked' : ''}>${t('fNoPhoto')}</label>
+        <p><button class="sm" data-sv="${s.id}">${t('saveRow')}</button> <button class="ghost sm" data-ed="${s.id}">${t('cancel')}</button></p></div>`;
   app.innerHTML = `<section class="band"><div class="wrap">
     <h2>${t('admin')}</h2>
     <div class="card"><label for="aPick">${t('managing')}</label><select id="aPick">${events.map(e => `<option value="${e.id}"${e.id === ev.id ? ' selected' : ''}>${esc(t('roundDate', e.round, e.event_date))}</option>`).join('')}</select>
@@ -282,15 +301,18 @@ async function adminView() {
       <label class="chk"><input type="checkbox" id="aOpen"${ev.signup_open ? ' checked' : ''}>${t('open')}</label>
       <p><button id="aSave">${t('saveEv')}</button></p><div class="msg" id="aMsg"></div></div>
 
-    <h3>${esc(t('listTitle', all.length, ev.cap))}</h3><div class="card">
+    <h3>${t('listTitle')}</h3><div class="card">
       <p class="muted">${t('listNote')}</p>
-      ${all.map((s, i) => `<div class="admin-row"><span class="no" style="font-weight:700;color:var(--or)">${i + 1}</span>
-        <span><b>${esc(s.name)}</b> <span class="muted">${esc(t('age', s.age))}</span> ${s.is_volunteer ? `<span class="tag v">${t('tagVol')}</span>` : ''}${s.no_photo ? ` <span class="tag np">${t('tagNoPhoto')}</span>` : ''}${i >= ev.cap ? ` <span class="tag">${t('waitlist')}</span>` : ''}</span>
-        <select data-team="${s.id}" aria-label="${t('teams')}"><option value="">${t('unassigned')}</option>${Object.entries(TEAMS).map(([k, v]) => `<option value="${k}"${tmap[s.id] === k ? ' selected' : ''}>${v}</option>`).join('')}</select>
-        <input type="number" step="0.5" min="0" max="24" data-hours="${s.id}" value="${hmap[s.id] != null ? esc(hmap[s.id]) : ''}" placeholder="${s.is_volunteer ? t('hoursPh') : '—'}" aria-label="${t('hoursPh')}">
-        <button class="ghost sm" data-rm="${s.id}">${t('remove')}</button></div>`).join('') || `<p class="muted">${t('noneYet')}</p>`}
+      <h3>${esc(t('listVols', vols.length))}</h3>${vols.map((s, i, arr) => adminRow(s, i, arr, false)).join('') || `<p class="muted">${t('emptyVol')}</p>`}
+      <h3>${esc(t('listPlayers', players.length, ev.cap))}</h3>${players.map((s, i, arr) => adminRow(s, i, arr, i >= ev.cap)).join('') || `<p class="muted">${t('noneYet')}</p>`}
       <p><button class="ghost" id="aAuto">${t('autoTeams')}</button> <button class="ghost" id="aFill">${t('fill4')}</button> <button id="aSaveL">${t('saveList')}</button></p>
       <div class="msg" id="lMsg"></div></div>
+    <details class="card" style="margin-top:12px"><summary><b>${t('addFor')}</b></summary>
+      <div class="row2"><div><label for="adName">${t('fName')}</label><input type="text" id="adName" maxlength="40"></div><div><label for="adAge">${t('fAge')}</label><input type="number" id="adAge" min="1" max="99"></div></div>
+      <label for="adType">${t('typeLabel')}</label><select id="adType"><option value="p">${t('typePlayer')}</option><option value="v">${t('typeVol')}</option></select>
+      <label class="chk"><input type="checkbox" id="adAfter" checked>${t('fAfter')}</label>
+      <label class="chk"><input type="checkbox" id="adNoPhoto">${t('fNoPhoto')}</label>
+      <p><button id="adBtn">${t('add')}</button></p><div class="msg" id="adMsg"></div></details>
 
     <h3>${t('photosN', photos?.length || 0)}</h3><div class="card">
       <p class="muted">${t('photoNote')}</p>
@@ -319,7 +341,7 @@ async function adminView() {
     error ? msg($('aMsg'), errText(error)) : msg($('aMsg'), t('saved'), true);
   };
   $('aAuto').onclick = () => {
-    const big = confirmed.filter(s => s.age >= 6).sort((a, b) => b.is_volunteer - a.is_volunteer || b.age - a.age);
+    const big = [...vols, ...confirmed.filter(s => s.age >= 6)].sort((a, b) => b.is_volunteer - a.is_volunteer || b.age - a.age);
     big.forEach((s, i) => { app.querySelector(`[data-team="${s.id}"]`).value = [0, 3].includes(i % 4) ? 'A' : 'B'; });
     confirmed.filter(s => s.age < 6).forEach(s => { app.querySelector(`[data-team="${s.id}"]`).value = 'T'; });
     msg($('lMsg'), t('autoDone'), true);
@@ -336,6 +358,38 @@ async function adminView() {
     if (hDel.length) ops.push(sb.from('volunteer_hours').delete().in('signup_id', hDel));
     const res = await Promise.all(ops); const bad = res.find(r => r.error);
     bad ? msg($('lMsg'), errText(bad.error)) : msg($('lMsg'), t('saved'), true);
+  };
+  const byId = Object.fromEntries(all.map(x => [x.id, x]));
+  app.querySelectorAll('[data-ed]').forEach(b => b.onclick = () => $('ed' + b.dataset.ed).classList.toggle('hidden'));
+  app.querySelectorAll('[data-sv]').forEach(b => b.onclick = async () => {
+    const box = $('ed' + b.dataset.sv), f = k => box.querySelector(`[data-f="${k}"]`);
+    const name = f('name').value.trim(), age = parseInt(f('age').value, 10);
+    if (!name) return msg($('lMsg'), t('eName')); if (!(age > 0 && age < 100)) return msg($('lMsg'), t('eAge'));
+    b.disabled = true;
+    const { error } = await sb.from('signups').update({ name, age, is_volunteer: f('type').value === 'v', join_after: f('after').checked, no_photo: f('nophoto').checked }).eq('id', b.dataset.sv);
+    if (error) { b.disabled = false; return msg($('lMsg'), error.code === '23505' ? t('eDup') : errText(error)); }
+    adminView();
+  });
+  app.querySelectorAll('[data-mv]').forEach(b => b.onclick = async () => {
+    const a = byId[b.dataset.mv], c = byId[b.dataset.to]; if (!a || !c) return;
+    let ta = c.created_at, tc = a.created_at;
+    if (ta === tc) { const d = new Date(new Date(ta).getTime() + (a.id < c.id ? 1 : -1)); tc = d.toISOString(); }
+    b.disabled = true;
+    const r1 = await sb.from('signups').update({ created_at: ta }).eq('id', a.id);
+    const r2 = r1.error ? r1 : await sb.from('signups').update({ created_at: tc }).eq('id', c.id);
+    const err = r1.error || r2.error;
+    if (err) return msg($('lMsg'), errText(err));
+    const { data: chk } = await sb.from('signups').select('created_at').eq('id', a.id).single();
+    if (chk && chk.created_at === a.created_at) return msg($('lMsg'), t('needMigration'));
+    adminView();
+  });
+  $('adBtn').onclick = async () => {
+    const name = $('adName').value.trim(), age = parseInt($('adAge').value, 10);
+    if (!name) return msg($('adMsg'), t('eName')); if (!(age > 0 && age < 100)) return msg($('adMsg'), t('eAge'));
+    $('adBtn').disabled = true;
+    const { error } = await sb.from('signups').insert({ event_id: ev.id, name, age, is_volunteer: $('adType').value === 'v', join_after: $('adAfter').checked, no_photo: $('adNoPhoto').checked });
+    if (error) { $('adBtn').disabled = false; return msg($('adMsg'), error.code === '23505' ? t('eDup') : errText(error)); }
+    adminView();
   };
   app.querySelectorAll('[data-rm]').forEach(b => b.onclick = async () => {
     if (b.dataset.sure !== '1') { b.dataset.sure = '1'; b.textContent = t('sureShort'); return; }

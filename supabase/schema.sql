@@ -72,12 +72,16 @@ create table if not exists public.signups (
 create index if not exists signups_event_idx on public.signups(event_id, created_at);
 create unique index if not exists signups_unique_name on public.signups(event_id, user_id, lower(name));
 
--- 报名时间由服务器决定，防止插队
+-- 报名时间由服务器决定，防止插队（组织者可在后台调整顺序）
 create or replace function public.signup_stamp() returns trigger
 language plpgsql as $$
 begin
-  if tg_op = 'INSERT' then new.created_at := now(); new.user_id := auth.uid();
-  else new.created_at := old.created_at; new.user_id := old.user_id; new.event_id := old.event_id;
+  if tg_op = 'INSERT' then
+    new.user_id := coalesce(auth.uid(), new.user_id);
+    if not public.is_admin() then new.created_at := now(); end if;
+  else
+    new.user_id := old.user_id; new.event_id := old.event_id;
+    if not public.is_admin() then new.created_at := old.created_at; end if;
   end if;
   return new;
 end $$;

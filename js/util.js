@@ -21,10 +21,11 @@ export function ordinal(n) {
 }
 export const cap1 = s => s.charAt(0).toUpperCase() + s.slice(1);
 
-// 名单按报名时间排序，分出正式名单与候补
+// 名单按报名时间排序：义工单独一列（不占人数上限），参加者按上限分出正式名单与候补
 export function splitRoster(signups, cap) {
   const all = [...signups].sort((a, b) => String(a.created_at).localeCompare(String(b.created_at)) || a.id - b.id);
-  return { confirmed: all.slice(0, cap), waitlist: all.slice(cap), all };
+  const vols = all.filter(s => s.is_volunteer), players = all.filter(s => !s.is_volunteer);
+  return { vols, players, confirmed: players.slice(0, cap), waitlist: players.slice(cap), all };
 }
 
 // 小时数显示：4 → "4"，2.5 → "2.5"

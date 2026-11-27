@@ -88,3 +88,6 @@ td.num,th.num{text-align:right;font-variant-numeric:tabular-nums;white-space:now
 footer{text-align:center;color:var(--mute);font-size:14px;padding:28px 16px}
 .stack2{display:grid;gap:20px;max-width:760px}
 .rhead{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}.rhead h2{margin:0}
+.admin-edit{background:var(--bg);border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin:4px 0 8px}
+.admin-edit label input,.admin-edit label select{margin-top:4px}
+details summary{cursor:pointer;min-height:32px}
