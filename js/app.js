@@ -340,13 +340,16 @@ async function adminView() {
   const { vols, players, confirmed, all } = splitRoster(signups, ev.cap);
   const { data: hrs } = await sb.from('volunteer_hours').select('*').in('signup_id', all.map(s => s.id).concat([0]));
   const hmap = Object.fromEntries((hrs || []).map(h => [h.signup_id, h.hours]));
+  const { data: allHrs } = await sb.from('volunteer_hours').select('hours,signups!inner(user_id,name)');
+  const vkey = x => `${x.user_id}|${String(x.name).trim().toLowerCase()}`;
+  const totals = {}; (allHrs || []).forEach(h => { const k = vkey(h.signups); totals[k] = (totals[k] || 0) + Number(h.hours); });
   const { data: rep } = await sb.from('reports').select('*').eq('event_id', ev.id).maybeSingle();
   const { data: photos } = await sb.from('photos').select('*').eq('event_id', ev.id);
 
   const adminRow = (s, i, arr, wait) => `<div class="admin-row"><span class="no" style="font-weight:700;color:var(--or)">${i + 1}</span>
         <span><b>${esc(s.name)}</b> <span class="muted">${esc(t('age', s.age))}</span>${s.join_after ? ` <span class="tag">${t('tagAfter')}</span>` : ''}${s.no_photo ? ` <span class="tag np">${t('tagNoPhoto')}</span>` : ''}${wait ? ` <span class="tag">${t('waitlist')}</span>` : ''}</span>
         <select data-team="${s.id}" aria-label="${t('teams')}"><option value="">${t('unassigned')}</option>${Object.entries(TEAMS).map(([k, v]) => `<option value="${k}"${tmap[s.id] === k ? ' selected' : ''}>${v}</option>`).join('')}</select>
-        ${s.is_volunteer ? `<input type="number" step="0.5" min="0" max="24" data-hours="${s.id}" value="${hmap[s.id] != null ? esc(hmap[s.id]) : ''}" placeholder="${t('hoursPh')}" aria-label="${t('hoursPh')}">` : '<span></span>'}
+        ${s.is_volunteer ? `<span class="hrs"><label class="hrs-l">${t('weekHours')}<input type="number" step="0.5" min="0" max="24" data-hours="${s.id}" value="${hmap[s.id] != null ? esc(hmap[s.id]) : ''}" placeholder="—"></label><span class="hrs-t">${t('totalHours')}<b>${esc(fmtHours(totals[vkey(s)] || 0))}</b></span></span>` : '<span></span>'}
         <span class="wide" style="display:flex;gap:4px;flex-wrap:wrap">
           <button class="ghost sm" data-mv="${s.id}" data-to="${arr[i - 1]?.id ?? ''}" aria-label="${t('up')}"${i ? '' : ' disabled'}>↑</button>
           <button class="ghost sm" data-mv="${s.id}" data-to="${arr[i + 1]?.id ?? ''}" aria-label="${t('down')}"${i < arr.length - 1 ? '' : ' disabled'}>↓</button>
