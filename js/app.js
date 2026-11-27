@@ -88,6 +88,7 @@ async function forecast(date) {
 }
 
 // ---------- 本周活动 ----------
+const fullName = s => [s.first_name, s.last_name].filter(Boolean).join(' ').trim();
 function rosterRow(s, i, tmap) {
   const tr = t; let out = '';
   if (s.is_volunteer) out += `<span class="tag v">${tr('tagVol')}</span>`;
@@ -125,7 +126,8 @@ async function homeView() {
       ${!S.user ? `<p>${t('needLogin')}</p><a href="#/login"><button>${t('loginToSign')}</button></a>` :
       !canSign ? `<p class="muted">${ev.status === 'cancel' ? t('closedCancel') : t('closed')}</p>` : `
       <form id="sf" novalidate>
-        <div class="row2"><div><label for="fName">${t('fName')}</label><input type="text" id="fName" maxlength="40" placeholder="${t('fNamePh')}" autocomplete="off"></div>
+        <div class="row2"><div><label for="fFirst">${t('fFirst')}</label><input type="text" id="fFirst" maxlength="40" autocomplete="off"></div><div><label for="fLast">${t('fLast')}</label><input type="text" id="fLast" maxlength="40" autocomplete="off"></div></div>
+        <div class="row2"><div><label for="fName">${t('fPref')}</label><input type="text" id="fName" maxlength="40" placeholder="${t('fPrefPh')}" autocomplete="off"></div>
         <div><label for="fAge">${t('fAge')}</label><input type="number" id="fAge" min="1" max="99" inputmode="numeric"></div></div>
         <label for="fType">${t('typeLabel')}</label><select id="fType"><option value="p">${t('typePlayer')}</option><option value="v">${t('typeVol')}</option></select>
         <label class="chk"><input type="checkbox" id="fAfter" checked>${t('fAfter')}</label>
@@ -166,12 +168,12 @@ async function homeView() {
   const sf = $('sf');
   if (sf) sf.onsubmit = async e => {
     e.preventDefault(); const m = $('fMsg');
-    const name = $('fName').value.trim(), age = parseInt($('fAge').value, 10);
-    if (!name) return msg(m, t('eName')); if (!(age > 0 && age < 100)) return msg(m, t('eAge'));
+    const first_name = $('fFirst').value.trim(), last_name = $('fLast').value.trim(), name = $('fName').value.trim() || first_name, age = parseInt($('fAge').value, 10);
+    if (!first_name || !last_name) return msg(m, t('eFull')); if (!(age > 0 && age < 100)) return msg(m, t('eAge'));
     if (!$('fRules').checked) return msg(m, t('eRules'));
     $('fBtn').disabled = true;
-    const { error } = await sb.from('signups').insert({ event_id: ev.id, name, age, is_volunteer: $('fType').value === 'v', join_after: $('fAfter').checked, no_photo: $('fNoPhoto').checked });
-    if (error) { $('fBtn').disabled = false; return msg(m, error.code === '23505' ? t('eDup') : t('eSign') + errText(error)); }
+    const { error } = await sb.from('signups').insert({ event_id: ev.id, first_name, last_name, name, age, is_volunteer: $('fType').value === 'v', join_after: $('fAfter').checked, no_photo: $('fNoPhoto').checked });
+    if (error) { $('fBtn').disabled = false; return msg(m, error.code === '23505' ? t('eDup') : /first_name|last_name/.test(error.message || '') ? t('needMig3') : t('eSign') + errText(error)); }
     homeView();
   };
   app.querySelectorAll('[data-del]').forEach(b => b.onclick = async () => {
@@ -347,7 +349,7 @@ async function adminView() {
   const { data: photos } = await sb.from('photos').select('*').eq('event_id', ev.id);
 
   const adminRow = (s, i, arr, wait) => `<div class="admin-row"><span class="no" style="font-weight:700;color:var(--or)">${i + 1}</span>
-        <span><b>${esc(s.name)}</b> <span class="muted">${esc(t('age', s.age))}</span>${s.join_after ? ` <span class="tag">${t('tagAfter')}</span>` : ''}${s.no_photo ? ` <span class="tag np">${t('tagNoPhoto')}</span>` : ''}${wait ? ` <span class="tag">${t('waitlist')}</span>` : ''}</span>
+        <span><b>${esc(s.name)}</b>${fullName(s) && fullName(s) !== s.name ? ` <span class="muted">(${esc(fullName(s))})</span>` : ''} <span class="muted">${esc(t('age', s.age))}</span>${s.join_after ? ` <span class="tag">${t('tagAfter')}</span>` : ''}${s.no_photo ? ` <span class="tag np">${t('tagNoPhoto')}</span>` : ''}${wait ? ` <span class="tag">${t('waitlist')}</span>` : ''}</span>
         <select data-team="${s.id}" aria-label="${t('teams')}"><option value="">${t('unassigned')}</option>${Object.entries(TEAMS).map(([k, v]) => `<option value="${k}"${tmap[s.id] === k ? ' selected' : ''}>${v}</option>`).join('')}</select>
         ${s.is_volunteer ? `<span class="hrs"><label class="hrs-l">${t('weekHours')}<input type="number" step="0.5" min="0" max="24" data-hours="${s.id}" value="${hmap[s.id] != null ? esc(hmap[s.id]) : ''}" placeholder="—"></label><span class="hrs-t">${t('totalHours')}<b>${esc(fmtHours(totals[vkey(s)] || 0))}</b></span></span>` : '<span></span>'}
         <span class="wide" style="display:flex;gap:4px;flex-wrap:wrap">
@@ -356,7 +358,8 @@ async function adminView() {
           <button class="ghost sm" data-ed="${s.id}">${t('edit')}</button>
           <button class="ghost sm" data-rm="${s.id}">${t('remove')}</button></span></div>
       <div class="admin-edit hidden" id="ed${s.id}">
-        <div class="row2"><div><label>${t('fName')}<input type="text" data-f="name" value="${esc(s.name)}" maxlength="40"></label></div><div><label>${t('fAge')}<input type="number" data-f="age" value="${esc(s.age)}" min="1" max="99"></label></div></div>
+        <div class="row2"><div><label>${t('fFirst')}<input type="text" data-f="first" value="${esc(s.first_name || '')}" maxlength="40"></label></div><div><label>${t('fLast')}<input type="text" data-f="last" value="${esc(s.last_name || '')}" maxlength="40"></label></div></div>
+        <div class="row2"><div><label>${t('fPref')}<input type="text" data-f="name" value="${esc(s.name)}" maxlength="40"></label></div><div><label>${t('fAge')}<input type="number" data-f="age" value="${esc(s.age)}" min="1" max="99"></label></div></div>
         <label>${t('typeLabel')}<select data-f="type"><option value="p"${s.is_volunteer ? '' : ' selected'}>${t('typePlayer')}</option><option value="v"${s.is_volunteer ? ' selected' : ''}>${t('typeVol')}</option></select></label>
         <label class="chk"><input type="checkbox" data-f="after"${s.join_after ? ' checked' : ''}>${t('fAfter')}</label>
         <label class="chk"><input type="checkbox" data-f="nophoto"${s.no_photo ? ' checked' : ''}>${t('fNoPhoto')}</label>
@@ -383,7 +386,8 @@ async function adminView() {
       <p><button class="ghost" id="aAuto">${t('autoTeams')}</button> <button class="ghost" id="aFill">${t('fill4')}</button> <button id="aSaveL">${t('saveList')}</button></p>
       <div class="msg" id="lMsg"></div></div>
     <details class="card" style="margin-top:12px"><summary><b>${t('addFor')}</b></summary>
-      <div class="row2"><div><label for="adName">${t('fName')}</label><input type="text" id="adName" maxlength="40"></div><div><label for="adAge">${t('fAge')}</label><input type="number" id="adAge" min="1" max="99"></div></div>
+      <div class="row2"><div><label for="adFirst">${t('fFirst')}</label><input type="text" id="adFirst" maxlength="40"></div><div><label for="adLast">${t('fLast')}</label><input type="text" id="adLast" maxlength="40"></div></div>
+      <div class="row2"><div><label for="adName">${t('fPref')}</label><input type="text" id="adName" maxlength="40" placeholder="${t('fPrefPh')}"></div><div><label for="adAge">${t('fAge')}</label><input type="number" id="adAge" min="1" max="99"></div></div>
       <label for="adType">${t('typeLabel')}</label><select id="adType"><option value="p">${t('typePlayer')}</option><option value="v">${t('typeVol')}</option></select>
       <label class="chk"><input type="checkbox" id="adAfter" checked>${t('fAfter')}</label>
       <label class="chk"><input type="checkbox" id="adNoPhoto">${t('fNoPhoto')}</label>
@@ -438,10 +442,10 @@ async function adminView() {
   app.querySelectorAll('[data-ed]').forEach(b => b.onclick = () => $('ed' + b.dataset.ed).classList.toggle('hidden'));
   app.querySelectorAll('[data-sv]').forEach(b => b.onclick = async () => {
     const box = $('ed' + b.dataset.sv), f = k => box.querySelector(`[data-f="${k}"]`);
-    const name = f('name').value.trim(), age = parseInt(f('age').value, 10);
+    const first_name = f('first').value.trim(), last_name = f('last').value.trim(), name = f('name').value.trim() || first_name, age = parseInt(f('age').value, 10);
     if (!name) return msg($('lMsg'), t('eName')); if (!(age > 0 && age < 100)) return msg($('lMsg'), t('eAge'));
     b.disabled = true;
-    const { error } = await sb.from('signups').update({ name, age, is_volunteer: f('type').value === 'v', join_after: f('after').checked, no_photo: f('nophoto').checked }).eq('id', b.dataset.sv);
+    const { error } = await sb.from('signups').update({ first_name, last_name, name, age, is_volunteer: f('type').value === 'v', join_after: f('after').checked, no_photo: f('nophoto').checked }).eq('id', b.dataset.sv);
     if (error) { b.disabled = false; return msg($('lMsg'), error.code === '23505' ? t('eDup') : errText(error)); }
     adminView();
   });
@@ -459,10 +463,10 @@ async function adminView() {
     adminView();
   });
   $('adBtn').onclick = async () => {
-    const name = $('adName').value.trim(), age = parseInt($('adAge').value, 10);
+    const first_name = $('adFirst').value.trim(), last_name = $('adLast').value.trim(), name = $('adName').value.trim() || first_name, age = parseInt($('adAge').value, 10);
     if (!name) return msg($('adMsg'), t('eName')); if (!(age > 0 && age < 100)) return msg($('adMsg'), t('eAge'));
     $('adBtn').disabled = true;
-    const { error } = await sb.from('signups').insert({ event_id: ev.id, name, age, is_volunteer: $('adType').value === 'v', join_after: $('adAfter').checked, no_photo: $('adNoPhoto').checked });
+    const { error } = await sb.from('signups').insert({ event_id: ev.id, first_name, last_name, name, age, is_volunteer: $('adType').value === 'v', join_after: $('adAfter').checked, no_photo: $('adNoPhoto').checked });
     if (error) { $('adBtn').disabled = false; return msg($('adMsg'), error.code === '23505' ? t('eDup') : errText(error)); }
     adminView();
   };
@@ -488,7 +492,7 @@ async function adminView() {
   $('rGen').onclick = async () => {
     const { data: h2 } = await sb.from('volunteer_hours').select('*').in('signup_id', all.map(s => s.id).concat([0]));
     const hm = Object.fromEntries((h2 || []).map(h => [h.signup_id, h.hours]));
-    const vols = all.filter(s => hm[s.id] != null && Number(hm[s.id]) > 0).map(s => ({ name: s.name, hours: hm[s.id] }));
+    const vols = all.filter(s => hm[s.id] != null && Number(hm[s.id]) > 0).map(s => ({ name: fullName(s) || s.name, hours: hm[s.id] }));
     const r = buildReport(ev, vols, { headcount: confirmed.length, highlight: $('rHi').value });
     $('rTitle').value = r.title; $('rBody').value = r.body;
     msg($('rMsg'), vols.length ? t('genOk') : t('genNoVol'), !!vols.length);

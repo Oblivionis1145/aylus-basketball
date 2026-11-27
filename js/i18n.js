@@ -49,7 +49,7 @@ const D = {
     loadingArchive: '正在读取 AYLUS 网站上的报告和照片…', photosIntro: '包括 AYLUS 网站上发布的活动照片和本站上传的照片，AYLUS 上有新报告时会自动出现。点照片可放大，左右键切换。',
     reportsIntro: '自动收录 AYLUS 网站上 Syosset-Woodbury 篮球活动的全部报告（从 2025 年第 14 次起），新报告发布后会自动出现。', aylusDown: '（AYLUS 网站暂时读取不到，目前只显示本站内容。）',
     photoCount: (e, n) => `${e} 次活动，${n} 张照片`, readReport: '看报告', ownSite: '本站', onAylus: '在 AYLUS 网站查看原文',
-    weekHours: '本周时长', totalHours: '累计时长', langBtn: 'EN',
+    fFirst: 'First name（名）', fLast: 'Last name（姓）', fPref: 'Preferred name（名单上显示的称呼）', fPrefPh: '不填则用 First name', eFull: '请填写 First name 和 Last name', needMig3: '网站正在更新，请稍后再试（组织者需运行 003_full_names.sql）', weekHours: '本周时长', totalHours: '累计时长', langBtn: 'EN',
   },
   en: {
     brand: 'AYLUS Community Basketball', navHome: 'This week', navPhotos: 'Photos', navReports: 'Reports', navHours: 'Volunteer hours', navAdmin: 'Admin',
@@ -92,7 +92,7 @@ const D = {
     loadingArchive: 'Loading reports and photos from aylus.org…', photosIntro: 'Photos from reports on aylus.org plus photos uploaded here. New AYLUS reports show up automatically. Click a photo to enlarge; use the arrow keys to browse.',
     reportsIntro: 'Every Syosset-Woodbury basketball report on aylus.org since the 14th event of 2025, added automatically as new ones are posted.', aylusDown: '(aylus.org could not be reached right now, so only this site’s content is shown.)',
     photoCount: (e, n) => `${e} event${e === 1 ? '' : 's'}, ${n} photo${n === 1 ? '' : 's'}`, readReport: 'Read report', ownSite: 'This site', onAylus: 'View on aylus.org',
-    weekHours: 'This week', totalHours: 'Total hours', langBtn: '中文',
+    fFirst: 'First name', fLast: 'Last name', fPref: 'Preferred name (shown on the list)', fPrefPh: 'Leave blank to use first name', eFull: 'Please enter first and last name', needMig3: 'The site is being updated; please try again shortly (organizer: run 003_full_names.sql)', weekHours: 'This week', totalHours: 'Total hours', langBtn: '中文',
   },
 };
 
