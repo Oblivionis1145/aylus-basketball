@@ -89,13 +89,15 @@ async function forecast(date) {
 
 // ---------- 本周活动 ----------
 const fullName = s => [s.first_name, s.last_name].filter(Boolean).join(' ').trim();
+// 公开显示：全名（Preferred name）；没填 Preferred name 就只显示全名；旧报名没有全名时显示称呼
+const showName = s => { const f = fullName(s); if (!f) return s.name; return s.name && s.name !== s.first_name && s.name !== f ? `${f}（${s.name}）` : f; };
 function rosterRow(s, i, tmap) {
   const tr = t; let out = '';
   if (s.is_volunteer) out += `<span class="tag v">${tr('tagVol')}</span>`;
   if (s.join_after) out += `<span class="tag">${tr('tagAfter')}</span>`;
   if (S.isAdmin && s.no_photo) out += `<span class="tag np">${tr('tagNoPhoto')}</span>`;
   if (tmap[s.id]) out += `<span class="tag g">${esc(TEAMS[tmap[s.id]])}</span>`;
-  return `<li><span class="no">${i}.</span><span class="nm">${esc(s.name)}<small>${esc(tr('age', s.age))}</small></span><span class="tags">${out}</span></li>`;
+  return `<li><span class="no">${i}.</span><span class="nm">${esc(showName(s))}<small>${esc(tr('age', s.age))}</small></span><span class="tags">${out}</span></li>`;
 }
 async function homeView() {
   if (!sb) { app.innerHTML = staticInfo(); return; }
@@ -135,7 +137,7 @@ async function homeView() {
         <label class="chk"><input type="checkbox" id="fRules">${t('fRules')}</label>
         <button id="fBtn">${t('fBtn')}</button><div class="msg" id="fMsg"></div>
       </form>`}
-      ${mine.length ? `<h3>${t('mine')}</h3><ul class="mine">${mine.map(s => { const vp = vols.indexOf(s) + 1, p = confirmed.indexOf(s) + 1, w = waitlist.indexOf(s) + 1; return `<li><span><b>${esc(s.name)}</b> · ${vp ? t('vpos', vp) : p ? t('pos', p) : t('wpos', w)}</span><button class="ghost sm" data-del="${esc(s.id)}">${t('cancelSign')}</button></li>`; }).join('')}</ul><p class="muted">${t('multi')}</p>` : ''}
+      ${mine.length ? `<h3>${t('mine')}</h3><ul class="mine">${mine.map(s => { const vp = vols.indexOf(s) + 1, p = confirmed.indexOf(s) + 1, w = waitlist.indexOf(s) + 1; return `<li><span><b>${esc(showName(s))}</b> · ${vp ? t('vpos', vp) : p ? t('pos', p) : t('wpos', w)}</span><button class="ghost sm" data-del="${esc(s.id)}">${t('cancelSign')}</button></li>`; }).join('')}</ul><p class="muted">${t('multi')}</p>` : ''}
     </div>
     <div class="card"><div class="rhead"><h2>${t('volRoster')}（${vols.length}）</h2></div>
       <div class="muted">${t('volNote')}</div>
@@ -150,7 +152,7 @@ async function homeView() {
     </div>
   </div></section>
   <section class="band alt"><div class="wrap"><h2>${t('teams')}</h2>
-    ${hasTeams ? `<div class="teams">${Object.keys(byTeam).filter(k => byTeam[k].length).map(k => `<div class="card"><h3 style="margin-top:0">${esc(TEAMS[k])}（${byTeam[k].length}）</h3><ul>${byTeam[k].map(s => `<li>${esc(s.name)} ${esc(t('age', s.age))}${s.is_volunteer ? t('volMark') : ''}</li>`).join('')}</ul></div>`).join('')}</div>` : `<p class="muted">${t('noTeams')}</p>`}
+    ${hasTeams ? `<div class="teams">${Object.keys(byTeam).filter(k => byTeam[k].length).map(k => `<div class="card"><h3 style="margin-top:0">${esc(TEAMS[k])}（${byTeam[k].length}）</h3><ul>${byTeam[k].map(s => `<li>${esc(showName(s))} ${esc(t('age', s.age))}${s.is_volunteer ? t('volMark') : ''}</li>`).join('')}</ul></div>`).join('')}</div>` : `<p class="muted">${t('noTeams')}</p>`}
   </div></section>
   ${staticInfo()}`;
   forecast(ev.event_date).then(w => {
@@ -161,7 +163,7 @@ async function homeView() {
   });
   const cl = $('copyList');
   if (cl) cl.onclick = async () => {
-    const line = (x, i) => `${i}. ${x.name}，${x.age}${x.is_volunteer ? '（义工）' : ''}${x.join_after ? ' 参加' : ''}`;
+    const line = (x, i) => `${i}. ${showName(x)}，${x.age}${x.is_volunteer ? '（义工）' : ''}${x.join_after ? ' 参加' : ''}`;
     const txt = [`#接龙 ${t('roundLine', String(ev.event_date).slice(0, 4), ev.round)}`, `${fmtDate(ev.event_date)} ${ev.time_text}`, '', ...(vols.length ? [t('volRoster'), ...vols.map((x, i) => line(x, i + 1)), ''] : []), t('roster'), ...confirmed.map((x, i) => line(x, i + 1)), ...(waitlist.length ? ['', t('waitlist'), ...waitlist.map((x, i) => line(x, i + 1))] : []), '', location.origin + '/'].join('\n');
     try { await navigator.clipboard.writeText(txt); cl.textContent = t('copied'); } catch { cl.textContent = t('copyFail'); }
   };
@@ -349,7 +351,7 @@ async function adminView() {
   const { data: photos } = await sb.from('photos').select('*').eq('event_id', ev.id);
 
   const adminRow = (s, i, arr, wait) => `<div class="admin-row"><span class="no" style="font-weight:700;color:var(--or)">${i + 1}</span>
-        <span><b>${esc(s.name)}</b>${fullName(s) && fullName(s) !== s.name ? ` <span class="muted">(${esc(fullName(s))})</span>` : ''} <span class="muted">${esc(t('age', s.age))}</span>${s.join_after ? ` <span class="tag">${t('tagAfter')}</span>` : ''}${s.no_photo ? ` <span class="tag np">${t('tagNoPhoto')}</span>` : ''}${wait ? ` <span class="tag">${t('waitlist')}</span>` : ''}</span>
+        <span><b>${esc(showName(s))}</b> <span class="muted">${esc(t('age', s.age))}</span>${s.join_after ? ` <span class="tag">${t('tagAfter')}</span>` : ''}${s.no_photo ? ` <span class="tag np">${t('tagNoPhoto')}</span>` : ''}${wait ? ` <span class="tag">${t('waitlist')}</span>` : ''}</span>
         <select data-team="${s.id}" aria-label="${t('teams')}"><option value="">${t('unassigned')}</option>${Object.entries(TEAMS).map(([k, v]) => `<option value="${k}"${tmap[s.id] === k ? ' selected' : ''}>${v}</option>`).join('')}</select>
         ${s.is_volunteer ? `<span class="hrs"><label class="hrs-l">${t('weekHours')}<input type="number" step="0.5" min="0" max="24" data-hours="${s.id}" value="${hmap[s.id] != null ? esc(hmap[s.id]) : ''}" placeholder="—"></label><span class="hrs-t">${t('totalHours')}<b>${esc(fmtHours(totals[vkey(s)] || 0))}</b></span></span>` : '<span></span>'}
         <span class="wide" style="display:flex;gap:4px;flex-wrap:wrap">
