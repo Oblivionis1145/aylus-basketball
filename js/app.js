@@ -38,29 +38,76 @@ function renderAuth() {
     box.innerHTML = `<a href="#/login"><button class="sm">${t('login')}</button></a>`;
   }
 }
-function loginView() {
+// 登录方式：邮箱 + 密码。首次注册用邮件验证码确认邮箱；忘记密码用邮件验证码重设。
+let authFlow = false; // 注册/重设过程中，不让登录状态变化打断当前页面
+function loginView(mode = 'login') {
+  authFlow = false;
+  const tabs = ['login', 'register', 'forgot'].map(m => `<button type="button" class="tab${m === mode ? ' on' : ''}" data-mode="${m}">${t('tab_' + m)}</button>`).join('');
+  const pw = (id, ac) => `<input type="password" id="${id}" minlength="6" autocomplete="${ac}" required>`;
+  const body = {
+    login: `<form id="af"><label for="aEmail">${t('email')}</label><input type="email" id="aEmail" required autocomplete="email" inputmode="email">
+      <label for="aPw">${t('password')}</label>${pw('aPw', 'current-password')}
+      <p><button id="aBtn">${t('login')}</button></p><p class="muted">${t('loginHint')}</p></form>`,
+    register: `<form id="af"><p class="muted">${t('regIntro')}</p><label for="aEmail">${t('email')}</label><input type="email" id="aEmail" required autocomplete="email" inputmode="email">
+      <label for="aPw">${t('newPassword')}</label>${pw('aPw', 'new-password')}<label for="aPw2">${t('confirmPassword')}</label>${pw('aPw2', 'new-password')}
+      <p><button id="aBtn">${t('sendCode')}</button></p></form>`,
+    forgot: `<form id="af"><p class="muted">${t('forgotIntro')}</p><label for="aEmail">${t('email')}</label><input type="email" id="aEmail" required autocomplete="email" inputmode="email">
+      <p><button id="aBtn">${t('sendCode')}</button></p></form>`,
+  }[mode];
   app.innerHTML = `<section class="band"><div class="wrap card" style="max-width:460px">
-    <h2>${t('loginTitle')}</h2>
-    <p class="muted">${t('loginIntro')}</p>
-    <form id="lf"><label for="lEmail">${t('email')}</label><input type="email" id="lEmail" required autocomplete="email" inputmode="email">
-    <p><button id="lBtn">${t('sendLogin')}</button></p></form>
-    <form id="cf" class="hidden"><label for="lCode">${t('code')}</label><input type="text" id="lCode" inputmode="numeric" autocomplete="one-time-code" maxlength="10">
-    <p><button>${t('login')}</button></p></form>
+    <h2>${t('loginTitle')}</h2><div class="tabs">${tabs}</div>${body}
+    <form id="cf" class="hidden"><label for="cCode">${t('code')}</label><input type="text" id="cCode" inputmode="numeric" autocomplete="one-time-code" maxlength="10">
+      <div id="newPwBox" class="hidden"><label for="cPw">${t('newPassword')}</label>${pw('cPw', 'new-password')}<label for="cPw2">${t('confirmPassword')}</label>${pw('cPw2', 'new-password')}</div>
+      <p><button id="cBtn">${t('confirm')}</button> <button type="button" class="ghost" id="resend">${t('resend')}</button></p></form>
     <div class="msg" id="lMsg"></div></div></section>`;
-  let email = '';
-  $('lf').onsubmit = async e => {
-    e.preventDefault(); email = $('lEmail').value.trim(); if (!email) return;
-    $('lBtn').disabled = true;
-    const { error } = await sb.auth.signInWithOtp({ email, options: { emailRedirectTo: location.origin + location.pathname } });
-    $('lBtn').disabled = false;
-    if (error) return msg($('lMsg'), t('sendFail') + errText(error));
-    msg($('lMsg'), t('sent'), true); $('cf').classList.remove('hidden');
+  app.querySelectorAll('[data-mode]').forEach(b => b.onclick = () => loginView(b.dataset.mode));
+  const m = $('lMsg'); let email = '';
+  const done = async () => { authFlow = false; await loadSession(); location.hash = '#/'; route(); };
+  const send = async () => {
+    if (mode === 'register') return sb.auth.signUp({ email, password: $('aPw').value, options: { emailRedirectTo: location.origin + '/' } });
+    return sb.auth.resetPasswordForEmail(email, { redirectTo: location.origin + '/#/login' });
+  };
+  const friendly = e => /rate limit/i.test(e?.message || '') ? t('rateLimit') : /already registered/i.test(e?.message || '') ? t('alreadyReg') : /invalid login/i.test(e?.message || '') ? t('badLogin') : errText(e);
+  $('af').onsubmit = async e => {
+    e.preventDefault(); email = $('aEmail').value.trim(); if (!email) return;
+    if (mode !== 'forgot' && $('aPw').value.length < 6) return msg(m, t('pwShort'));
+    if (mode === 'register' && $('aPw').value !== $('aPw2').value) return msg(m, t('pwMismatch'));
+    $('aBtn').disabled = true;
+    if (mode === 'login') {
+      const { error } = await sb.auth.signInWithPassword({ email, password: $('aPw').value });
+      $('aBtn').disabled = false;
+      return error ? msg(m, friendly(error)) : done();
+    }
+    authFlow = true;
+    const { data, error } = await send();
+    $('aBtn').disabled = false;
+    if (error) { authFlow = false; return msg(m, friendly(error)); }
+    if (mode === 'register' && data?.user && !data.user.identities?.length) { authFlow = false; return msg(m, t('alreadyReg')); }
+    if (mode === 'register' && data?.session) return done(); // 项目关闭了邮箱确认时直接登录
+    msg(m, t('codeSent'), true);
+    $('af').classList.add('hidden'); $('cf').classList.remove('hidden');
+    $('newPwBox').classList.toggle('hidden', mode !== 'forgot');
+    $('cCode').focus();
+  };
+  $('resend').onclick = async () => {
+    const { error } = mode === 'register' ? await sb.auth.resend({ type: 'signup', email }) : await send();
+    error ? msg(m, friendly(error)) : msg(m, t('codeSent'), true);
   };
   $('cf').onsubmit = async e => {
     e.preventDefault();
-    const { error } = await sb.auth.verifyOtp({ email, token: $('lCode').value.trim(), type: 'email' });
-    if (error) return msg($('lMsg'), t('badCode') + errText(error));
-    await loadSession(); location.hash = '#/';
+    const token = $('cCode').value.trim(); if (!token) return msg(m, t('code'));
+    if (mode === 'forgot') {
+      if ($('cPw').value.length < 6) return msg(m, t('pwShort'));
+      if ($('cPw').value !== $('cPw2').value) return msg(m, t('pwMismatch'));
+    }
+    $('cBtn').disabled = true;
+    const { error } = await sb.auth.verifyOtp({ email, token, type: mode === 'register' ? 'signup' : 'recovery' });
+    if (error) { $('cBtn').disabled = false; return msg(m, t('badCode') + friendly(error)); }
+    if (mode === 'forgot') {
+      const { error: e2 } = await sb.auth.updateUser({ password: $('cPw').value });
+      if (e2) { $('cBtn').disabled = false; return msg(m, friendly(e2)); }
+    }
+    done();
   };
 }
 
@@ -540,6 +587,9 @@ async function route() {
   }
 }
 window.addEventListener('hashchange', route);
-if (sb) sb.auth.onAuthStateChange((evt) => { if (evt === 'SIGNED_IN' || evt === 'SIGNED_OUT') loadSession().then(route); });
+if (sb) sb.auth.onAuthStateChange((evt) => {
+  if (evt === 'PASSWORD_RECOVERY') { location.hash = '#/login'; return; }
+  if (!authFlow && (evt === 'SIGNED_IN' || evt === 'SIGNED_OUT')) loadSession().then(route);
+});
 await loadSession();
 route();

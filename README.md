@@ -5,7 +5,8 @@
 **功能**
 - 本周活动：时间地点、活动安排、规则说明、状态（正常 / 待定 / 取消），并自动显示 NWS 天气预报（遇雨雪会提示）
 - 义工接龙和参加者接龙分开公示，所有人可见；义工不占参加者名额
-- 邮箱登录（无需密码）后接龙报名：称呼、年龄、是否义工、是否参加训练后活动、是否不拍照；按报名先后排序，超出人数上限自动进候补，有人取消时自动顺延
+- 账号：邮箱 + 密码登录；首次注册用邮件验证码确认邮箱；忘记密码用邮件验证码重设
+- 登录后接龙报名：称呼、年龄、是否义工、是否参加训练后活动、是否不拍照；按报名先后排序，超出人数上限自动进候补，有人取消时自动顺延
 - 后台编辑本周接龙：修改信息、上下调整顺序、移除、代报名
 - 分组：组织者分 A 队 / B 队 / 训练与自由活动，或按年龄一键分队
 - 义工时长：每位义工每次活动一个数值，**只有组织者能填和改**；义工可以看自己的累计和明细，所有人可看排行榜
@@ -22,7 +23,7 @@
 1. 在 supabase.com 新建项目，Region 选 **East US**。
 2. 左侧 **SQL Editor** → New query，把 `supabase/schema.sql` 全部粘贴进去，点 Run。
 3. **Project Settings → API**，复制 `Project URL` 和 `anon public` key，填到 `js/config.js`（或发给 Claude 代填）。anon key 是公开密钥，放在网页里是安全的。
-4. **Authentication → Email Templates → Magic Link**，在正文里加一行 `验证码：{{ .Token }}`，这样家长在手机上也可以直接输验证码登录。
+4. **Authentication → Email Templates**：在 **Confirm signup** 和 **Reset Password** 两个模板正文里都加一行 `验证码 / Code: {{ .Token }}`（网站让用户输入验证码，而不是点链接）。
 5. 等第 2 步拿到网址后，回到 **Authentication → URL Configuration**，把 Site URL 和 Redirect URLs 都设为网站网址。
 
 > Supabase 自带的发信服务每小时只能发很少几封邮件，只适合测试。正式给家长用之前，建议在 **Authentication → SMTP Settings** 接一个免费的发信服务（例如 Resend，每月 3000 封免费）。家长在同一台手机上登录一次后会一直保持登录，不用每周收邮件。
