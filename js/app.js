@@ -111,6 +111,23 @@ function loginView(mode = 'login') {
   };
 }
 
+// 用户点了“重设密码”邮件里的链接（而不是输验证码）时，直接让他设新密码
+function setPasswordView() {
+  app.innerHTML = `<section class="band"><div class="wrap card" style="max-width:460px"><h2>${t('tab_forgot')}</h2>
+    <form id="spf"><label for="sPw">${t('newPassword')}</label><input type="password" id="sPw" minlength="6" autocomplete="new-password">
+    <label for="sPw2">${t('confirmPassword')}</label><input type="password" id="sPw2" minlength="6" autocomplete="new-password">
+    <p><button id="sBtn">${t('confirm')}</button></p></form><div class="msg" id="sMsg"></div></div></section>`;
+  $('spf').onsubmit = async e => {
+    e.preventDefault();
+    if ($('sPw').value.length < 6) return msg($('sMsg'), t('pwShort'));
+    if ($('sPw').value !== $('sPw2').value) return msg($('sMsg'), t('pwMismatch'));
+    $('sBtn').disabled = true;
+    const { error } = await sb.auth.updateUser({ password: $('sPw').value });
+    if (error) { $('sBtn').disabled = false; return msg($('sMsg'), errText(error)); }
+    authFlow = false; await loadSession(); location.hash = '#/'; route();
+  };
+}
+
 // ---------- 数据 ----------
 async function currentEvent() {
   const today = new Date(Date.now() - 5 * 3600e3).toISOString().slice(0, 10); // 美东大致日期
@@ -588,7 +605,7 @@ async function route() {
 }
 window.addEventListener('hashchange', route);
 if (sb) sb.auth.onAuthStateChange((evt) => {
-  if (evt === 'PASSWORD_RECOVERY') { location.hash = '#/login'; return; }
+  if (evt === 'PASSWORD_RECOVERY') { authFlow = true; setPasswordView(); return; }
   if (!authFlow && (evt === 'SIGNED_IN' || evt === 'SIGNED_OUT')) loadSession().then(route);
 });
 await loadSession();
