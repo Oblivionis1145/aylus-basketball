@@ -31,6 +31,7 @@
 1. 用 GitHub 账号登录 vercel.com → Add New Project → 选这个仓库。
 2. Framework Preset 选 **Other**，其它都不用改，点 Deploy。
 3. 得到 `xxx.vercel.app` 网址。以后每次往 `main` 推代码都会自动更新网站。
+4. 正式网址：https://aylus-basketball.com（域名在 Cloudflare，DNS 记录设为 DNS only / 灰色云朵，指向 Vercel）。
 
 ### 3. 设自己为组织者
 1. 打开网站，用你的邮箱登录一次。
